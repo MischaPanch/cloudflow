@@ -5,7 +5,7 @@ CloudFlow in your AWS account you will get a stack containing a CloudFlow projec
 pipelines for building, deploying, testing, and maintaining CloudFormation stacks together with their dependencies on commits to
 the project's repository.
 
-## Why should I use it'?'
+## Why should I use it?
 
 Using CloudFlow is extremely simple and can enormously boost a cloud-developers productivity!
 No overhead and no external tools are needed to set it up. Once a project is generated for a developer, the recipient can

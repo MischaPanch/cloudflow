@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Run CodeBuild on every commit as part of CI/CD pipeline"
+
+Parameters:
+  ProjectName:
+    Type: String
+  BranchName:
+    Type: String
+    Default: develop
+
+Resources:
+  ExecuteTest:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: !Sub "index.handler"
+      FunctionName: !Sub "${ProjectName}-${BranchName}-ExecuteTests"
+      Role: !GetAtt TestExecutionRole.Arn
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import json
+
+          client = boto3.client('codepipeline')
+
+          def handler(event, context):
+              print(f"Received event {event}")
+              job = event["CodePipeline.job"]
+              job_id = job["id"]
+
+              try:
+                  custom_parameter = job["data"]["actionConfiguration"]["configuration"].get("UserParameters")
+                  success_message = f'Received user parameter {custom_parameter}'
+                  print("Sending success message to CodePipeline")
+                  response = client.put_job_success_result(
+                      jobId=job_id,
+                      executionDetails={
+                          'summary': success_message,
+                          'percentComplete': 100
+                      }
+                  )
+                  status_code = 200
+              except Exception as e:
+                  print("Something went wrong, sending failure message to CodePipeline")
+                  response = client.put_job_failure_result(
+                      jobId=job_id,
+                      failureDetails={
+                          'type': 'JobFailed',
+                          'message': f'Execution failed with error: {e}'
+                      }
+                  )
+                  status_code = 500
+
+              return {'statusCode': status_code, 'response': json.dumps(response)}
+      Runtime: "python3.7"
+      Timeout: 5
+      TracingConfig:
+        Mode: "Active"
+
+  TestExecutionRole:
+    Type: AWS::IAM::Role
+    Description: "Role used for testing the referenced Stack"
+    Properties:
+      RoleName: !Sub "${ProjectName}-${BranchName}-TestExecutionRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/AWSXrayFullAccess
+      Policies:
+        - PolicyName: "NotifyCodePipeline"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codepipeline:PutJobFailureResult
+                  - codepipeline:PutJobSuccessResult
+                Resource: "*"

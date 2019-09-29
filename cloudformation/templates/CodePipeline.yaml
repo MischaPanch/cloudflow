@@ -1,0 +1,189 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CodePipeline for a CICD Project branch"
+Parameters:
+  ProjectName:
+    Type: String
+  ProjectIsGenerator:
+    Type: String
+    Default: "False"
+  BuildArtifactsBucket:
+    Type: String
+  StackS3Location:
+    Type: String
+  BranchName:
+    Type: String
+    Description: "Branch name or alias for it - cannot contain backslashes!"
+    AllowedPattern: "[^\\\\]*"
+  Stage:
+    Type: String
+    AllowedValues: ["feature", "develop", "master"]
+  # see https://stackoverflow.com/questions/55539412/can-cloudformation-ssm-dynamic-reference-with-type-stringlist-resolve-to-list
+  ProjectPolicyArns:
+    Type: AWS::SSM::Parameter::Value<List<String>>
+
+Conditions:
+  StageIsMaster:
+    !Equals [!Ref Stage, "master"]
+  StageIsFeature:
+    !Equals [!Ref Stage, "feature"]
+  ProjectIsGenerator:
+    !Equals  [!Ref ProjectIsGenerator, "True"]
+
+Resources:
+# This role has to contain permissions to create and delete all the resources in the stacks that will be deployed 
+# with the resulting CodePipeline. It will be used in all actions
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${BranchName}-DeploymentRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns: !Ref ProjectPolicyArns
+      Policies:
+        - PolicyName: "RolePolicyFullAccess"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - iam:*Role*
+                  - iam:*Policy*
+                Resource: "*"
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub "${ProjectName}-${BranchName}-DeploymentPipeline"
+      RestartExecutionOnUpdate: False
+      RoleArn:
+        !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: '{{resolve:ssm:CloudflowArtifactsBucket:1}}'
+      Stages:
+        - Name: "GetSource"
+          Actions:
+            - Name: "get_cloudformation_artifact_from_s3"
+              RunOrder: 1
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Configuration:
+                S3Bucket: !Ref BuildArtifactsBucket
+                S3ObjectKey: !Ref StackS3Location
+                PollForSourceChanges: False
+              OutputArtifacts:
+                  - Name: "CfnArtifact"
+
+        - Name: "DeployStack"
+          Actions:
+            - Name: "deploy_stack_from_cloudformation_artifact"
+              InputArtifacts: [Name: "CfnArtifact"]
+              RunOrder: 2
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: !If [StageIsFeature, REPLACE_ON_FAILURE, CREATE_UPDATE]
+                Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                ParameterOverrides: !Sub '{
+                  "BranchName": "${BranchName}", 
+                  "ProjectName": "${ProjectName}",
+                  "BuildArtifactsBucket": "${BuildArtifactsBucket}"
+                }'
+                RoleArn: !GetAtt CodePipelineServiceRole.Arn
+                StackName: !If [ProjectIsGenerator, !Ref ProjectName, !Sub "${ProjectName}-${BranchName}Stack"]
+                TemplatePath: CfnArtifact::stack.yaml
+                TemplateConfiguration: !If [StageIsMaster, "CfnArtifact::live_config.json", "CfnArtifact::develop_config.json"]
+
+        - Name: "RunTests"
+          Actions:
+            - Name: "invoke_lambda"
+              RunOrder: 3
+              ActionTypeId:
+                Category: Invoke
+                Owner: AWS
+                Version: 1
+                Provider: Lambda
+              Configuration:
+                FunctionName: !Sub "${ProjectName}-${BranchName}-ExecuteTests"
+                UserParameters: !Sub "${ProjectName},${BranchName}"
+        - !If
+          - StageIsFeature
+          - Name: "DeleteStack"
+            Actions:
+              - Name: "delete_stack"
+                RunOrder: 4
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Version: 1
+                  Provider: CloudFormation
+                Configuration:
+                  ActionMode: DELETE_ONLY
+                  Capabilities: CAPABILITY_IAM
+                  RoleArn: !GetAtt CodePipelineServiceRole.Arn
+                  StackName: !Sub "${ProjectName}-${BranchName}Stack"
+          - !Ref AWS::NoValue
+
+  TriggerCodepipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${BranchName}-TriggerDeployment"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-deployment-execution"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${CodePipeline}'
+
+# IMPORTANT: This only works if there is a CloudTrail configured to listen on the build artifacts bucket.
+# This trail has to be created only once. Codepipelines created through the AWS console create and configure a trail on their own.
+  TriggerCodepipelineEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${BranchName}-DeploymentTrigger"
+      Description: "Trigger deployment CodePipeline on changes of corresponding stack.zip in S3"
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - 'AWS API Call via CloudTrail'
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - PutObject
+            - CompleteMultipartUpload
+            - CopyObject
+          requestParameters:
+            bucketName:
+              - !Ref BuildArtifactsBucket
+            key:
+              - !Ref StackS3Location
+      Targets:
+        - Arn:
+            !Sub "arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${CodePipeline}"
+          RoleArn: !GetAtt TriggerCodepipelineRole.Arn
+          Id: !Sub "${ProjectName}-${BranchName}-DeploymentTrigger"

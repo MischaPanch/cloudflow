@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Placeholder stack with an S3 and a test"
+
+Parameters:
+  BucketName:
+    Type: String
+    
+  # The following parameters are needed by CloudFlow. Don't change them unless you know what you're doing
+  BuildArtifactsBucket:
+    Type: String
+  ProjectVersion:
+    Type: String
+  ProjectName:
+    Type: String
+  BranchName:
+    Type: String
+    Default: develop
+
+
+Resources:
+  DummyS3:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: !Sub "${BucketName}-${BranchName}"
+
+
+  # Lambda that will be invoked for testing this stack (from the corresponding branch)
+  ExecuteTest:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/ExecuteTest.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        BranchName: !Ref BranchName

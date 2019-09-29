@@ -1,0 +1,9 @@
+{
+  "Parameters": {
+    "ProjectVersion": "0.1.0",
+    "ProjectTemplate": "default"
+  },
+  "Tags": {
+    "createdBy": "CloudFlow"
+  }
+}

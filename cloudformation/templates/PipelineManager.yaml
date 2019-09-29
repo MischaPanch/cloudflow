@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Lambda function to react on branch creation in CodeCommit by calling CloudFormation to create a new
+CodePipeline for this branch and to delete the pipeline when the branch is deleted"
+
+Parameters:
+  Name:
+    Type: String
+    Default: PipelineManager
+  CodeS3Location:
+    Type: String
+
+  ProjectName:
+    Type: String
+  BuildArtifactsBucket:
+    Type: String
+  TemplateURL:
+    Type: String
+
+
+Resources:
+  CreateDeleteCodePipeline:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${Name}-${ProjectName}"
+      Handler: !Sub "${Name}.handler"
+      Role: !GetAtt CreateDeleteCodePipelineRole.Arn
+      Description: "Run CloudFormation to create or delete a CodePipeline on branch events."
+      Code:
+        S3Bucket: !Ref BuildArtifactsBucket
+        S3Key: !Sub "${CodeS3Location}/${Name}.zip"
+      Runtime: "python3.7"
+      Timeout: 25
+      Environment:
+        Variables:
+          BuildArtifactsBucket: !Ref BuildArtifactsBucket
+          ProjectName: !Ref ProjectName
+          TemplateURL: !Ref TemplateURL
+
+  CreateDeleteCodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Name}-${ProjectName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess 
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess 
+      Policies:
+        - PolicyName: !Sub "CreateDeleteCodePipelineStack"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+                Effect: Allow
+                Action:
+                  - iam:*Role*
+                  - events:*
+                Resource: '*'
+
+Outputs:
+  LambdaArn:
+    Value: !GetAtt CreateDeleteCodePipeline.Arn

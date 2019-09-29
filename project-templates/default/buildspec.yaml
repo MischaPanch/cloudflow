@@ -1,0 +1,24 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: openjdk8
+
+    commands:
+      - git config --global user.email "cloudflow@codebuild.com" && git config --global user.name "cloudflow"
+
+  pre_build:
+    commands:
+      - chmod 755 *.sh
+      - git merge develop
+
+  build:
+    commands:
+      - ./build.sh
+
+artifacts:
+  discard-paths: no
+  base-directory: 'target'
+  files:
+    - '**/*'

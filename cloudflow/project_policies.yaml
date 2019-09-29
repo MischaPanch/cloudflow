@@ -1,0 +1,10 @@
+admin: "arn:aws:iam::aws:policy/AdministratorAccess"
+default: "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess,
+          arn:aws:iam::aws:policy/AWSLambdaFullAccess,
+          arn:aws:iam::aws:policy/AWSCodeCommitFullAccess,
+          arn:aws:iam::aws:policy/AWSCloudFormationFullAccess,
+          arn:aws:iam::aws:policy/AmazonS3FullAccess,
+          arn:aws:iam::aws:policy/AWSXrayFullAccess,
+          arn:aws:iam::aws:policy/CloudWatchFullAccess,
+          arn:aws:iam::aws:policy/AWSCodePipelineFullAccess,
+          arn:aws:iam::aws:policy/AmazonSSMFullAccess"

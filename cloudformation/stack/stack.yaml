@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFlow CI/CD Project"
+
+Parameters:
+
+  # Generator specific parameters
+  ProjectTemplate:
+    Type: String
+    Default: default
+  ProjectIsGenerator:
+    Type: String
+    Default: False
+  ProjectPolicyArns:
+    Type: String
+    Default: "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess,
+              arn:aws:iam::aws:policy/AWSLambdaFullAccess,
+              arn:aws:iam::aws:policy/AWSCodeCommitFullAccess,
+              arn:aws:iam::aws:policy/AWSCloudFormationFullAccess,
+              arn:aws:iam::aws:policy/AmazonS3FullAccess,
+              arn:aws:iam::aws:policy/AWSXrayFullAccess,
+              arn:aws:iam::aws:policy/CloudWatchFullAccess,
+              arn:aws:iam::aws:policy/AWSCodePipelineFullAccess,
+              arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+
+
+  # The following parameters are needed by CloudFlow. Don't change them unless you know what you're doing
+  BuildArtifactsBucket:
+    Type: String
+  ProjectVersion:
+    Type: String
+  ProjectName:
+    Type: String
+  BranchName:
+    Type: String
+
+Conditions:
+  DeployingMyselfOnMaster: !Equals [!Ref "AWS::StackName", !Ref "ProjectName"]
+  DeployingMyselfOnOtherBranch: !Equals [!Ref "AWS::StackName", !Sub "${ProjectName}-${BranchName}Stack"]
+  DeployingMyself: !Or [Condition: DeployingMyselfOnMaster, Condition: DeployingMyselfOnOtherBranch]
+  # NotDeployingMyself: !Not [Condition: DeployingMyself]
+
+Resources:
+  Repository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      Code:
+        S3:
+          Bucket: !Ref BuildArtifactsBucket 
+          Key: !Sub "${ProjectName}/${BranchName}/latest/project-templates/${ProjectTemplate}.zip"
+
+      RepositoryDescription: "Repository as part of CI/CD dev pipeline"
+      RepositoryName: !Ref AWS::StackName
+      Triggers:
+        - Name: "Trigger CodeBuild on commit"
+          Branches: []
+          DestinationArn: !GetAtt CodeBuild.Outputs.LambdaArn
+          Events:
+            - all
+          CustomData: !Ref AWS::StackName
+        - Name: "Create or delete CodePipeline on branch events"
+          Branches: []
+          DestinationArn: !GetAtt PipelineManager.Outputs.LambdaArn
+          Events:
+            - createReference
+            - deleteReference
+          CustomData: !Ref AWS::StackName
+      Tags:
+        - Key: "description"
+          Value: "Repository as part of CI/CD project"
+
+  CodeBuild:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/CodeBuild.yaml"
+      Parameters:
+        ProjectName: !Ref AWS::StackName
+        BuildArtifactsBucket: !Ref BuildArtifactsBucket
+        CodeS3Location: !Sub "${ProjectName}/${BranchName}/${ProjectVersion}/lambda"
+
+  TriggerCodeBuildPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: codecommit.amazonaws.com
+      SourceArn: !GetAtt Repository.Arn
+      FunctionName: !GetAtt CodeBuild.Outputs.LambdaArn
+
+  PipelineManager:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/PipelineManager.yaml"
+      Parameters:
+      # Parameters needed in CodePipeline.yaml
+        ProjectName: !Ref AWS::StackName
+        BuildArtifactsBucket: !Ref BuildArtifactsBucket
+      # Additional Parameters for Lambda
+        CodeS3Location: !Sub "${ProjectName}/${BranchName}/${ProjectVersion}/lambda"
+        TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/CodePipeline.yaml"
+
+  TriggerPipelineManagerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: codecommit.amazonaws.com
+      SourceArn: !GetAtt Repository.Arn
+      FunctionName: !GetAtt PipelineManager.Outputs.LambdaArn
+
+  CodePipelineForMaster:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: PolicyArnsParameter
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/CodePipeline.yaml"
+      Parameters:
+        ProjectName: !Ref AWS::StackName
+        ProjectIsGenerator: !Ref ProjectIsGenerator
+        ProjectPolicyArns: !Sub "${AWS::StackName}-Policies"
+        BuildArtifactsBucket: !Ref BuildArtifactsBucket
+        StackS3Location: !Sub "${AWS::StackName}/master/latest/cloudformation/stack.zip"
+        BranchName: "master"
+        Stage: "master"
+
+  ExecuteTest:
+    Type: AWS::CloudFormation::Stack
+    Condition: DeployingMyself
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${BuildArtifactsBucket}/${ProjectName}/${BranchName}/${ProjectVersion}/cloudformation/templates/ExecuteTest.yaml"
+      Parameters:
+        ProjectName: !Ref ProjectName
+        BranchName: !Ref BranchName
+  
+  PolicyArnsParameter:  
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: !Sub "Policies for CloudFlow project ${AWS::StackName}"
+      Name: !Sub "${AWS::StackName}-Policies"
+      Type: StringList
+      Value: !Ref ProjectPolicyArns

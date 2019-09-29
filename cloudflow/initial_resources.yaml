@@ -1,0 +1,89 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CodePipeline for a CICD Project branch"
+
+Parameters:
+  BuildArtifactsBucket:
+    Type: String
+    Default: cloudflow-build-artifacts
+  
+  CloudflowArtifactsBucket:
+    Type: String
+    Default: cloudflow-additional-artifacts
+
+  CloudTrail:
+    Type: String
+    Default: cloudflow-cloudtrail
+
+Resources:
+  cloudTrail:
+    DependsOn: cloudflowArtifactsBucketPolicy
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      S3BucketName: !Ref CloudflowArtifactsBucket
+      TrailName: !Ref CloudTrail
+      IncludeGlobalServiceEvents: false
+      IsLogging: true
+      EventSelectors:
+        - ReadWriteType: WriteOnly
+          IncludeManagementEvents: False
+          DataResources:
+            - Type: AWS::S3::Object
+              Values:
+                - !Sub "arn:aws:s3:::${BuildArtifactsBucket}/"
+              
+
+  cloudflowArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CloudflowArtifactsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'cloudtrail.amazonaws.com'
+            Action: 's3:GetBucketAcl'
+            Resource: !Sub 'arn:aws:s3:::${CloudflowArtifactsBucket}'
+          - Effect: Allow
+            Principal:
+              Service: 'cloudtrail.amazonaws.com'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${CloudflowArtifactsBucket}/*'
+
+  buildArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: !Ref BuildArtifactsBucket
+      VersioningConfiguration:
+        Status: Enabled
+  
+  cloudflowArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      AccessControl: Private
+      BucketName: !Ref CloudflowArtifactsBucket
+
+  cloudflowArtifactsBucketParameter:  
+    Type: AWS::SSM::Parameter
+    Properties: 
+      Description: "Bucket used for CloudFlow artifacts"
+      Name: CloudflowArtifactsBucket
+      Type: String
+      Value: !Ref CloudflowArtifactsBucket
+    
+  # defaultProjectPolicyArns:  
+  #   Type: AWS::SSM::Parameter
+  #   Properties: 
+  #     Description: "Default policies for CloudFlow projects"
+  #     Name: CloudflowDefaultPolicyArns
+  #     Type: StringList
+  #     Value: "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess,
+  #         arn:aws:iam::aws:policy/AWSLambdaFullAccess,
+  #         arn:aws:iam::aws:policy/AWSCodeCommitFullAccess,
+  #         arn:aws:iam::aws:policy/AWSCloudFormationFullAccess,
+  #         arn:aws:iam::aws:policy/AmazonS3FullAccess,
+  #         arn:aws:iam::aws:policy/AWSXrayFullAccess,
+  #         arn:aws:iam::aws:policy/CloudWatchFullAccess,
+  #         arn:aws:iam::aws:policy/AWSCodePipelineFullAccess,
+  #         arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"

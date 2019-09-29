@@ -1,0 +1,114 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Run CodeBuild on every commit as part of CI/CD pipeline"
+
+Parameters:
+  ProjectName:
+    Type: String
+  BuildArtifactsBucket:
+    Type: String
+  Name:
+    Type: String
+    Default: TriggerCodeBuild
+  CodeS3Location:
+    Type: String
+
+Resources:
+  TriggerCodeBuild:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: !Sub "${Name}.handler"
+      FunctionName: !Sub "${Name}-${ProjectName}"
+      Role: !GetAtt TriggerCodeBuildRole.Arn
+      Description: "Trigger CodeBuild on commit in CodeCommit"
+      Code:
+        S3Bucket: !Ref BuildArtifactsBucket
+        S3Key: !Sub "${CodeS3Location}/${Name}.zip"
+      Runtime: "python3.7"
+      Timeout: 25
+      TracingConfig:
+        Mode: "Active"
+      Environment:
+        Variables:
+          BuildArtifactsBucket: !Ref BuildArtifactsBucket
+          ProjectName: !Ref ProjectName
+
+  TriggerCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Name}-${ProjectName}"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "TriggerCodeBuild"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+                Effect: Allow
+                Action:
+                  - codebuild:*
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                  - logs:Create*
+                  - logs:Get*
+                  - logs:Put*
+                Resource: "*"
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-CodeBuild"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub "${ProjectName}-deployment-execution"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+                Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - logs:Create*
+                  - logs:Put*
+                  - codecommit:GitPull
+                  - s3:Get*
+                  - s3:PutObject
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectName
+      Source:
+        Type: CODECOMMIT
+        Location: !Sub "https://git-codecommit.${AWS::Region}.amazonaws.com/v1/repos/${ProjectName}"
+      Artifacts:
+#       This will be overridden by the lambda referenced in TriggerCodeBuild
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:2.0
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Tags:
+        - Key: "description"
+          Value: "CodeBuild as part of CI/CD project"
+Outputs:
+  LambdaArn:
+    Value: !GetAtt TriggerCodeBuild.Arn

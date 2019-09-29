@@ -1,0 +1,9 @@
+{
+  "Parameters" : {
+    "ProjectVersion": "0.1.0",
+    "BucketName": "dummy-bucket"
+  },
+  "Tags" : {
+    "createdBy": "CloudFlow"
+  }
+}

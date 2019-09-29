@@ -256,10 +256,6 @@ function deploy-project() {
   fi
 
   setup_aws_profile
-  
-  # echo -e "\e[92mDEPLOY_INFO: Registering the deployment policies for project $project_name in the ssm parameter store\e[0m"
-  # aws ssm put-parameter --type StringList --name "$project_name-PolicyArns" --value "$project_policy_arns" \
-  # --description "deployment policies for project $project_name" --overwrite
 
   aws cloudformation deploy \
   --template-file $STACK/stack.yaml \

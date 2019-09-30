@@ -37,7 +37,6 @@ Conditions:
   DeployingMyselfOnMaster: !Equals [!Ref "AWS::StackName", !Ref "ProjectName"]
   DeployingMyselfOnOtherBranch: !Equals [!Ref "AWS::StackName", !Sub "${ProjectName}-${BranchName}Stack"]
   DeployingMyself: !Or [Condition: DeployingMyselfOnMaster, Condition: DeployingMyselfOnOtherBranch]
-  # NotDeployingMyself: !Not [Condition: DeployingMyself]
 
 Resources:
   Repository:
@@ -130,6 +129,8 @@ Resources:
   
   PolicyArnsParameter:  
     Type: AWS::SSM::Parameter
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Delete
     Properties: 
       Description: !Sub "Policies for CloudFlow project ${AWS::StackName}"
       Name: !Sub "${AWS::StackName}-Policies"

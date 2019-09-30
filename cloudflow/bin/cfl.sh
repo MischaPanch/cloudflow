@@ -153,10 +153,10 @@ function configure() {
 
   prompt_configuration_entry AWS_REGION
   # updating default names before prompting
-  BUILD_ARTIFACTS_BUCKET=${BUILD_ARTIFACTS_BUCKET:-"cloudflow-artifacts-$AWS_ACCOUNT-$AWS_REGION"}
-  CLOUDFLOW_ARTIFACTS_BUCKET=${CLOUDFLOW_ARTIFACTS_BUCKET:-"codepipeline-artifact-store-$AWS_ACCOUNT-$AWS_REGION"}
-  CLOUDFLOW_CLOUDTRAIL=${CLOUDFLOW_CLOUDTRAIL:-"cloudflow-cloudtrail-$AWS_REGION"}
-  CLOUDFLOW_GENERATOR_NAME=${CLOUDFLOW_GENERATOR_NAME:-"cloudflow-generator"}
+  BUILD_ARTIFACTS_BUCKET=${BUILD_ARTIFACTS_BUCKET:-"cfl-build-artifacts-$AWS_ACCOUNT-$AWS_REGION"}
+  CLOUDFLOW_ARTIFACTS_BUCKET=${CLOUDFLOW_ARTIFACTS_BUCKET:-"cfl-artifact-store-$AWS_ACCOUNT-$AWS_REGION"}
+  CLOUDFLOW_CLOUDTRAIL=${CLOUDFLOW_CLOUDTRAIL:-"cfl-cloudtrail-$AWS_REGION"}
+  CLOUDFLOW_GENERATOR_NAME=${CLOUDFLOW_GENERATOR_NAME:-"cfl-projects-generator"}
   prompt_configuration_entry BUILD_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_CLOUDTRAIL

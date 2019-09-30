@@ -71,19 +71,3 @@ Resources:
       Name: CloudflowArtifactsBucket
       Type: String
       Value: !Ref CloudflowArtifactsBucket
-    
-  # defaultProjectPolicyArns:  
-  #   Type: AWS::SSM::Parameter
-  #   Properties: 
-  #     Description: "Default policies for CloudFlow projects"
-  #     Name: CloudflowDefaultPolicyArns
-  #     Type: StringList
-  #     Value: "arn:aws:iam::aws:policy/AWSCodeBuildAdminAccess,
-  #         arn:aws:iam::aws:policy/AWSLambdaFullAccess,
-  #         arn:aws:iam::aws:policy/AWSCodeCommitFullAccess,
-  #         arn:aws:iam::aws:policy/AWSCloudFormationFullAccess,
-  #         arn:aws:iam::aws:policy/AmazonS3FullAccess,
-  #         arn:aws:iam::aws:policy/AWSXrayFullAccess,
-  #         arn:aws:iam::aws:policy/CloudWatchFullAccess,
-  #         arn:aws:iam::aws:policy/AWSCodePipelineFullAccess,
-  #         arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"

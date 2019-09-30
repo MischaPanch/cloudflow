@@ -25,69 +25,15 @@ USAGE
   exit 1
 }
 
-while [[ "$1" == -* ]]; do
-  case "$1" in 
-    -h | --help)
-      usage;;
-    *) 
-      echo "ERROR: Unknown option $1"
-      usage
-  esac
-done
-
 # Default/pre-existing configuration
 # shellcheck source=../../build.conf
 source build.conf
 STACK=${STACK:-"cloudformation/stack"}
 PROJECT_TEMPLATES=${PROJECT_TEMPLATES:-"project-templates"}
 
-CLOUDFLOW_CONFIG=cloudflow/config.conf
+CLOUDFLOW_CONFIG="cloudflow/config.conf"
 # shellcheck source=../config.conf
 source $CLOUDFLOW_CONFIG
-AWS_PROFILE=${AWS_PROFILE:-"default"}
-AWS_REGION="${AWS_REGION:-$(aws --profile "$AWS_PROFILE" configure get region)}"
-AWS_ACCOUNT=$(aws --profile "$AWS_PROFILE" sts get-caller-identity | jq -r .Account)
-BUILD_ARTIFACTS_BUCKET=${BUILD_ARTIFACTS_BUCKET:-"cloudflow-artifacts-$AWS_ACCOUNT-$AWS_REGION"}
-CLOUDFLOW_ARTIFACTS_BUCKET=${CLOUDFLOW_ARTIFACTS_BUCKET:-"codepipeline-artifact-store-$AWS_ACCOUNT-$AWS_REGION"}
-CLOUDFLOW_GENERATOR_NAME=${CLOUDFLOW_GENERATOR_NAME:-"cloudflow-projects-generator"}
-CLOUDFLOW_CLOUDTRAIL=${CLOUDFLOW_CLOUDTRAIL:-"cloudflow-cloudtrail-$AWS_REGION"}
-
-# descriptions
-function init_usage {
-cat << USAGE >&2
-usage:
-  ${0##*/} init [options]
-
-description:
-  Configure and initialize CloudFlow and create a CI/CD projects generator.
-  Executing this will create an AWS CloudTrail and S3 Buckets if they don't already exist in the configured account.
-
-options:
-  --generator-only              Don't deploy the initial resources. 
-                                Use this option if you already initialized the configured cloudflow resources in your account.
-  --default-config | -d         Use default or previously created configuration
-  --help | -h                   
-USAGE
-  exit 1
-}
-
-function deploy_usage {
-cat << USAGE >&2
-usage:
-  ${0##*/} deploy-project --project-name <name>
-
-description:
-  Creates/updates a CloudFlow CI/CD project based on a project template. 
-
-options:
-  --generator-version | -v <version>    Version of the project generator to use for deploying. Default is latest
-  --project-template <name>             The name of a template-dir within the project-templates directory. Default is "default"
-  --project-is-generator                Use this flag when the created project is a project-generator itself. See the cloudflow docu
-                                        for more details on generators.              
-  --help | -h
-USAGE
-  exit 1
-}
 
 # error handling
 function check_nonempty_value() {
@@ -199,21 +145,43 @@ function configure() {
   # Previously configured options are default
   # shellcheck source=../config.conf
   source $CLOUDFLOW_CONFIG
+  AWS_PROFILE=${AWS_PROFILE:-"default"}
   prompt_configuration_entry AWS_PROFILE
   new_default_region=$(aws --profile "$AWS_PROFILE" configure get region)
   AWS_REGION=${AWS_REGION:-"$new_default_region"}
   AWS_ACCOUNT=$(aws --profile "$AWS_PROFILE" sts get-caller-identity | jq -r .Account)
 
   prompt_configuration_entry AWS_REGION
-  # updating default bucket names before prompting
+  # updating default names before prompting
   BUILD_ARTIFACTS_BUCKET=${BUILD_ARTIFACTS_BUCKET:-"cloudflow-artifacts-$AWS_ACCOUNT-$AWS_REGION"}
   CLOUDFLOW_ARTIFACTS_BUCKET=${CLOUDFLOW_ARTIFACTS_BUCKET:-"codepipeline-artifact-store-$AWS_ACCOUNT-$AWS_REGION"}
+  CLOUDFLOW_CLOUDTRAIL=${CLOUDFLOW_CLOUDTRAIL:-"cloudflow-cloudtrail-$AWS_REGION"}
+  CLOUDFLOW_GENERATOR_NAME=${CLOUDFLOW_GENERATOR_NAME:-"cloudflow-generator"}
   prompt_configuration_entry BUILD_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_CLOUDTRAIL
   prompt_configuration_entry CLOUDFLOW_GENERATOR_NAME
 }
 
+
+function deploy_usage {
+cat << USAGE >&2
+usage:
+  ${0##*/} deploy-project --project-name <name>
+
+description:
+  Creates/updates a CloudFlow CI/CD project based on a project template. 
+
+options:
+  --generator-version | -v <version>    Version of the project generator to use for deploying. Default is latest
+  --project-template <name>             The name of a template-dir within the project-templates directory. Default is "default"
+  --project-is-generator                Use this flag when the created project is a project-generator itself. See the cloudflow docu
+                                        for more details on generators.
+  --project-policies <key>              A key that is present in the file cloudflow/project_policies.yaml. The default key is "default"             
+  --help | -h
+USAGE
+  exit 1
+}
 
 function deploy-project() {
   project_template="default"
@@ -249,9 +217,11 @@ function deploy-project() {
     esac
   done
 
+  if [[ -z $project_name ]]; then "DEPLOY_ERROR: project-name cannot be empty" && exit 1; fi
+
   project_policy_arns=$(yq -r ".$project_policies_id" cloudflow/project_policies.yaml)
   if [[ -z $project_policy_arns ]]; then 
-    echo "DEPLOY_ERROR: empty project policies under id $project_policies_id in cloudflow/project_policies.yaml"
+    echo "DEPLOY_ERROR: empty project policies under key $project_policies_id in cloudflow/project_policies.yaml"
     exit 1
   fi
 
@@ -273,14 +243,38 @@ function deploy-project() {
   aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$project_name" 
 }
 
+function init_usage {
+cat << USAGE >&2
+usage:
+  ${0##*/} init [options]
+
+description:
+  Configure and initialize CloudFlow and create a CI/CD projects generator.
+  Executing this will create an AWS CloudTrail and S3 Buckets if they don't already exist in the configured account.
+
+options:
+  --generator-only              Don't deploy the initial resources. 
+                                Use this option if you already initialized the configured cloudflow resources in your account.
+  --no-generator                Don't deploy a cloudglow generator to your account. 
+                                Use this option if you want to manage projects directly from this repository 
+  --default-config | -d         Use previously created configuration. You should have called the init or configure command before using this flag
+  --help | -h                   
+USAGE
+  exit 1
+}
+
 function init() {
   configure=true
   deploy_initial_resources=true
+  deploy_generator=true
   while [[ "$1" == -* ]]; do
     case "$1" in
       --generator-only)
         shift
-        deploy_initial_resources=false;;
+        deploy_initial_resources=false;;     
+      --no-generator)
+        shift
+        deploy_generator=false;;
       -d | --default-config)
         shift
         configure=false ;; 
@@ -308,10 +302,12 @@ function init() {
     aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$CFL_INITIAL_STACK_NAME" 
   fi
 
-  bootstrap_generator_artifacts
-  
-  echo -e "\e[32mINIT_INFO: Deploying the generator $CLOUDFLOW_GENERATOR_NAME\e[0m"
-  deploy-project --project-name "$CLOUDFLOW_GENERATOR_NAME" --project-template "$CLOUDFLOW_GENERATOR_NAME"  --project-is-generator
+  if $deploy_generator; then
+    bootstrap_generator_artifacts
+    
+    echo -e "\e[32mINIT_INFO: Deploying the generator $CLOUDFLOW_GENERATOR_NAME\e[0m"
+    deploy-project --project-name "$CLOUDFLOW_GENERATOR_NAME" --project-template "$CLOUDFLOW_GENERATOR_NAME"  --project-is-generator
+  fi
 }
 
 # main entry point

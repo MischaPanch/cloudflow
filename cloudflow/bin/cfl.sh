@@ -217,7 +217,7 @@ function deploy-project() {
     esac
   done
 
-  if [[ -z $project_name ]]; then "DEPLOY_ERROR: project-name cannot be empty" && exit 1; fi
+  if [[ -z $project_name ]]; then echo "DEPLOY_ERROR: project-name cannot be empty" && exit 1; fi
 
   project_policy_arns=$(yq -r ".$project_policies_id" cloudflow/project_policies.yaml)
   if [[ -z $project_policy_arns ]]; then 

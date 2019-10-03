@@ -115,7 +115,8 @@ function bootstrap_generator_artifacts() {
   # packaging the current repository into ./tmp
   mkdir -p $PROJECT_TEMPLATES "tmp/$CLOUDFLOW_GENERATOR_NAME"
   rm -rf "tmp/$CLOUDFLOW_GENERATOR_NAME"/*
-  cp -r ./*[^tmp] "tmp/$CLOUDFLOW_GENERATOR_NAME/" && cp .gitignore "tmp/$CLOUDFLOW_GENERATOR_NAME/"
+  rsync --recursive --exclude=tmp --exclude=images \
+  ./* "tmp/$CLOUDFLOW_GENERATOR_NAME/" && cp .gitignore "tmp/$CLOUDFLOW_GENERATOR_NAME/"
   # replacing the readme
   mv "tmp/$CLOUDFLOW_GENERATOR_NAME/GENERATOR_README.md" "tmp/$CLOUDFLOW_GENERATOR_NAME/README.md"
   # preparing the workspace

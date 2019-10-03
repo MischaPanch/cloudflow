@@ -1,15 +1,17 @@
 # CloudFlow
 
 This repository contains a framework for gitflow-like CI/CD of AWS Infrastructure and all its dependencies. After initializing
-CloudFlow in your AWS account you will be able to create projects. A CloudFlow project will contain a repository that is connected to
-pipelines for building, deploying, testing, and maintaining CloudFormation stacks together with their dependencies on commits to
-the project's repository.
+CloudFlow in your AWS account you will be able to create projects. A CloudFlow CI/CD project is represented by the diagram below.
+![](images/project_architecture.png)
+
+It contains a CodeCommit repository that is connected to
+pipelines for building, deploying, testing, and maintaining CloudFormation stacks together with their dependencies on commits.
 
 ## Why should I use it?
 
 Using CloudFlow is extremely simple and can enormously boost a cloud-developer's productivity!
 No overhead and no external tools are needed to set it up - only AWS services like CodeBuild and CodePipeline are used.
-Once a project is generated for a developer, the recipient of the project can focus on developing CloudFormation templates, code, scripts for lambda functions and in fact any kind of artifact needed in AWS. The CloudFlow pipelines will take care of packaging the dependencies, deploying and testing the resulting stack and cleaning up.
+Once a project is generated for a developer, the recipient of the project can focus on developing CloudFormation templates, code, scripts for lambda functions and in fact any kind of artifact needed in AWS. The CloudFlow pipelines will take care of packaging the dependencies, deploying and testing the resulting stack and cleaning up, all triggered by commits.
 
 On top of that the AWS services that CloudFlow uses are essentially free (or at least really cheap).
 

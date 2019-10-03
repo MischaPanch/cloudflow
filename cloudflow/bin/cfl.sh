@@ -25,7 +25,7 @@ USAGE
   exit 1
 }
 
-# Default/pre-existing configuration
+# Path configuration
 # shellcheck source=../../build.conf
 source build.conf
 STACK=${STACK:-"cloudformation/stack"}
@@ -34,6 +34,10 @@ PROJECT_TEMPLATES=${PROJECT_TEMPLATES:-"project-templates"}
 CLOUDFLOW_CONFIG="cloudflow/config.conf"
 # shellcheck source=../config.conf
 source $CLOUDFLOW_CONFIG
+
+# hardcoded constant names
+BOOTSTRAP_GENERATOR="cfl-bootstrap"
+CFL_INITIAL_STACK_NAME="cloudflow-init"
 
 # error handling
 function check_nonempty_value() {
@@ -68,13 +72,13 @@ function prompt_configuration_entry() {
   read -rp "$1 [$default_value]: " new_value
   new_value=${new_value:-$default_value}
   # save the choice to the config file
-  replace_or_add_config "$1" "$new_value"
+  replace_or_add_cfl_config "$1" "$new_value"
   # and set the environment variable to its new value
   eval "$1=\$new_value"
 }
 
 # runtime configuration management
-function replace_or_add_config() {
+function replace_or_add_cfl_config() {
   if grep -q "^$1=" "$CLOUDFLOW_CONFIG"; then
     # update the configuration line
     sed -i'.original' "s/$1=.*/$1=$2/" "$CLOUDFLOW_CONFIG" && rm "$CLOUDFLOW_CONFIG".original
@@ -83,14 +87,14 @@ function replace_or_add_config() {
   fi
 }
 
-function add_cfn_config_parameter() {
+function add_stack_config_parameter() {
   config_file=$1
   key=$2
   value=\"$3\"
   jq ".Parameters.$key = $value" "$config_file" > tmp.$$.json && mv tmp.$$.json "$config_file"
 }
 
-function delete_cfn_config_parameter() {
+function delete_stack_config_parameter() {
   config_file=$1
   key=$2
   jq "del(.Parameters.$key)" "$config_file" > tmp.$$.json && mv tmp.$$.json "$config_file"
@@ -104,41 +108,47 @@ function setup_aws_profile() {
   export AWS_DEFAULT_OUTPUT="json"
 }
 
-# bootstrapping a generator is needed within the init function
+# used for bootstrapping a cloudflow generator
 function bootstrap_generator_artifacts() {
-  echo -e "\e[34mBOOTSTRAP_INFO: Creating the project template: ${CLOUDFLOW_GENERATOR_NAME} \e[0m"
+  setup_aws_profile
+  bootstrap_generator_name="$1"
+  echo -e "\e[34mBOOTSTRAP_INFO: Creating the project template: $bootstrap_generator_name \e[0m"
 
   # adding runtime parameters to stack configuration
-  add_cfn_config_parameter "$STACK/live_config.json" "ProjectTemplate" "$CLOUDFLOW_GENERATOR_NAME"
-
+  add_stack_config_parameter "$STACK/live_config.json" "ProjectTemplate" "$bootstrap_generator_name"
 
   # packaging the current repository into ./tmp
-  mkdir -p $PROJECT_TEMPLATES "tmp/$CLOUDFLOW_GENERATOR_NAME"
-  rm -rf "tmp/$CLOUDFLOW_GENERATOR_NAME"/*
+  mkdir -p $PROJECT_TEMPLATES "tmp/$bootstrap_generator_name"
+  rm -rf "tmp/$bootstrap_generator_name"/*
   rsync --recursive --exclude=tmp --exclude=images \
-  ./* "tmp/$CLOUDFLOW_GENERATOR_NAME/" && cp .gitignore "tmp/$CLOUDFLOW_GENERATOR_NAME/"
-  # replacing the readme
-  mv "tmp/$CLOUDFLOW_GENERATOR_NAME/GENERATOR_README.md" "tmp/$CLOUDFLOW_GENERATOR_NAME/README.md"
+  ./* "tmp/$bootstrap_generator_name/" && cp .gitignore "tmp/$bootstrap_generator_name/"
+
+  ( 
+    # preparing the generator
+    cd "tmp/$bootstrap_generator_name"
+    replace_or_add_cfl_config "GENERATOR_NAME" "$1" 
+    mv "GENERATOR_README.md" "README.md"
+  )
   # preparing the workspace
   cleanup="Y"
-  try-except "mkdir $PROJECT_TEMPLATES/$CLOUDFLOW_GENERATOR_NAME" \
+  try-except "mkdir $PROJECT_TEMPLATES/$bootstrap_generator_name" \
   1 \
-  "read -rp \"The file $PROJECT_TEMPLATES/$CLOUDFLOW_GENERATOR_NAME already exists, overwrite it? Y/[n] \" \"cleanup\" "
+  "read -rp \"The file $PROJECT_TEMPLATES/$bootstrap_generator_name already exists, overwrite it? Y/[n] \" \"cleanup\" "
   if [[ "$cleanup" != "Y" ]]; then abort; fi
-  rm -rf "$PROJECT_TEMPLATES/${CLOUDFLOW_GENERATOR_NAME:?}"
-  mv "tmp/$CLOUDFLOW_GENERATOR_NAME" "$PROJECT_TEMPLATES"
+  rm -rf "$PROJECT_TEMPLATES/${bootstrap_generator_name:?}"
+  mv "tmp/$bootstrap_generator_name" "$PROJECT_TEMPLATES"
   
   echo -e "\e[34mBOOTSTRAP_INFO: Building code-artifacts locally\e[0m"
   ./build.sh
 
   echo -e "\e[34mBOOTSTRAP_INFO: Uploading code-artifacts\e[0m"
-  aws s3 sync target "s3://$BUILD_ARTIFACTS_BUCKET/$CLOUDFLOW_GENERATOR_NAME/master"
+  aws s3 sync target "s3://$BUILD_ARTIFACTS_BUCKET/$bootstrap_generator_name/master"
 
   echo -e "\e[34mBOOTSTRAP_INFO: Performing cleanup\e[0m"
-  rm -rf "$PROJECT_TEMPLATES/${CLOUDFLOW_GENERATOR_NAME:?}"
+  delete_stack_config_parameter  "$STACK/live_config.json" "ProjectTemplate"
+  rm -rf "$PROJECT_TEMPLATES/${bootstrap_generator_name:?}"
   rm -rf tmp/*
   rm -rf target/*
-  delete_cfn_config_parameter "$STACK/live_config.json" "ProjectTemplate"
 }
 
 # cloudflow cli commands
@@ -157,11 +167,9 @@ function configure() {
   BUILD_ARTIFACTS_BUCKET=${BUILD_ARTIFACTS_BUCKET:-"cfl-build-artifacts-$AWS_ACCOUNT-$AWS_REGION"}
   CLOUDFLOW_ARTIFACTS_BUCKET=${CLOUDFLOW_ARTIFACTS_BUCKET:-"cfl-artifact-store-$AWS_ACCOUNT-$AWS_REGION"}
   CLOUDFLOW_CLOUDTRAIL=${CLOUDFLOW_CLOUDTRAIL:-"cfl-cloudtrail-$AWS_REGION"}
-  CLOUDFLOW_GENERATOR_NAME=${CLOUDFLOW_GENERATOR_NAME:-"cfl-projects-generator"}
   prompt_configuration_entry BUILD_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_ARTIFACTS_BUCKET
   prompt_configuration_entry CLOUDFLOW_CLOUDTRAIL
-  prompt_configuration_entry CLOUDFLOW_GENERATOR_NAME
 }
 
 
@@ -176,8 +184,8 @@ description:
 options:
   --generator-version | -v <version>    Version of the project generator to use for deploying. Default is latest
   --project-template <name>             The name of a template-dir within the project-templates directory. Default is "default"
-  --project-is-generator                Use this flag when the created project is a project-generator itself. See the cloudflow docu
-                                        for more details on generators.
+  --project-is-generator                Use this flag when the created project is a project-generator itself. 
+                                        See the cloudflow documentation for more details on generators.
   --project-policies <key>              A key that is present in the file cloudflow/project_policies.yaml. The default key is "default"             
   --help | -h
 USAGE
@@ -218,6 +226,8 @@ function deploy-project() {
     esac
   done
 
+  generator_name=${GENERATOR_NAME:-$BOOTSTRAP_GENERATOR}
+
   if [[ -z $project_name ]]; then echo "DEPLOY_ERROR: project-name cannot be empty" && exit 1; fi
 
   project_policy_arns=$(yq -r ".$project_policies_id" cloudflow/project_policies.yaml)
@@ -234,7 +244,7 @@ function deploy-project() {
   --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
   --no-fail-on-empty-changeset \
   --parameter-overrides "BuildArtifactsBucket=$BUILD_ARTIFACTS_BUCKET" \
-                        "ProjectName=$CLOUDFLOW_GENERATOR_NAME" \
+                        "ProjectName=$generator_name" \
                         "ProjectTemplate=$project_template" \
                         "ProjectPolicyArns=$project_policy_arns" \
                         "ProjectIsGenerator=$project_is_generator" \
@@ -254,10 +264,6 @@ description:
   Executing this will create an AWS CloudTrail and S3 Buckets if they don't already exist in the configured account.
 
 options:
-  --generator-only              Don't deploy the initial resources. 
-                                Use this option if you already initialized the configured cloudflow resources in your account.
-  --no-generator                Don't deploy a cloudglow generator to your account. 
-                                Use this option if you want to manage projects directly from this repository 
   --default-config | -d         Use previously created configuration. You should have called the init or configure command before using this flag
   --help | -h                   
 USAGE
@@ -266,16 +272,8 @@ USAGE
 
 function init() {
   configure=true
-  deploy_initial_resources=true
-  deploy_generator=true
   while [[ "$1" == -* ]]; do
     case "$1" in
-      --generator-only)
-        shift
-        deploy_initial_resources=false;;     
-      --no-generator)
-        shift
-        deploy_generator=false;;
       -d | --default-config)
         shift
         configure=false ;; 
@@ -290,25 +288,36 @@ function init() {
   if $configure; then configure; fi
   setup_aws_profile
 
-  if $deploy_initial_resources; then
-    CFL_INITIAL_STACK_NAME="cloudflow-init"
-    echo -e "\e[32mINIT_INFO: Deploying initial resources\e[0m"
-    aws cloudformation deploy \
-      --no-fail-on-empty-changeset \
-      --stack-name "$CFL_INITIAL_STACK_NAME" \
-      --template-file cloudflow/initial_resources.yaml \
-      --parameter-overrides "BuildArtifactsBucket=$BUILD_ARTIFACTS_BUCKET" \
-                            "CloudflowArtifactsBucket=$CLOUDFLOW_ARTIFACTS_BUCKET" \
-                            "CloudTrail=$CLOUDFLOW_CLOUDTRAIL"
-    aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$CFL_INITIAL_STACK_NAME" 
-  fi
+  echo -e "\e[32mINIT_INFO: Deploying initial resources\e[0m"
+  aws cloudformation deploy \
+    --no-fail-on-empty-changeset \
+    --stack-name "$CFL_INITIAL_STACK_NAME" \
+    --template-file cloudflow/initial_resources.yaml \
+    --parameter-overrides "BuildArtifactsBucket=$BUILD_ARTIFACTS_BUCKET" \
+                          "CloudflowArtifactsBucket=$CLOUDFLOW_ARTIFACTS_BUCKET" \
+                          "CloudTrail=$CLOUDFLOW_CLOUDTRAIL"
+  aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$CFL_INITIAL_STACK_NAME"
 
-  if $deploy_generator; then
-    bootstrap_generator_artifacts
-    
-    echo -e "\e[32mINIT_INFO: Deploying the generator $CLOUDFLOW_GENERATOR_NAME\e[0m"
-    deploy-project --project-name "$CLOUDFLOW_GENERATOR_NAME" --project-template "$CLOUDFLOW_GENERATOR_NAME"  --project-is-generator
-  fi
+  bootstrap_generator_artifacts "$BOOTSTRAP_GENERATOR"
+}
+
+function deploy-generator() {
+  while [[ "$1" == -* ]]; do
+    case "$1" in
+      --generator-name | -n)
+        generator_name="$2"
+        check_nonempty_value generator_name
+        shift 2 ;;
+      -h | --help)
+        init_usage ;;
+      *) 
+        echo "ERROR: Unknown option $1"
+        init_usage
+    esac
+  done
+  GENERATOR_NAME="$generator_name"
+  bootstrap_generator_artifacts "$generator_name"
+  deploy-project --project-name "$generator_name" --project-template "$generator_name"  --project-is-generator --project-policies "generator"
 }
 
 # main entry point
@@ -325,6 +334,10 @@ case "$1" in
     shift
     deploy-project "$@"
     ;;
+  deploy-generator)
+  shift
+  deploy-generator "$@"
+  ;;
   *) 
     echo "ERROR: unknown command $1"
     usage

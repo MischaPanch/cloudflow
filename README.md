@@ -9,9 +9,16 @@ pipelines for building, deploying, testing, and maintaining CloudFormation stack
 
 ## Why should I use it?
 
-Using CloudFlow is extremely simple and can enormously boost a cloud-developer's productivity!
-No overhead and no external tools are needed to set it up - only AWS services like CodeBuild and CodePipeline are used.
-Once a project is generated for a developer, the recipient of the project can focus on developing CloudFormation templates, code, scripts for lambda functions and in fact any kind of artifact needed in AWS. The CloudFlow pipelines will take care of packaging the dependencies, deploying and testing the resulting stack and cleaning up, all triggered by commits.
+Using CloudFlow is extremely simple and can enormously boost a cloud-developer's productivity! Some of the advantages of CloudFlow over other approaches are the following:
+
+1) No overhead and no external tools are needed to set it up. Only AWS services are used.
+2) Nested stacks are supported.
+3) All artifacts needed in a stack can be kept in a single repository.
+4) It is easy to share artifacts across projects.
+5) Build, deployment and testing happen on commit.
+6) You have the option to create and customize your own project generator
+
+Once a project is generated, the recipient of the project can focus on developing CloudFormation templates, code, scripts for lambda functions and in fact any kind of artifact needed for the stack. The CloudFlow pipelines will take care of packaging the dependencies, deploying and testing the resulting stack and cleaning up, all triggered by commits.
 
 On top of that the AWS services that CloudFlow uses are essentially free (or at least really cheap).
 

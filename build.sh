@@ -50,7 +50,6 @@ fi
 
 # Target path configuration. These paths are used by CloudFlow pipelines. Do not adjust them unless you know what you're doing
 # The target has to be the same as in the buildspec.yaml
-
 PROJECT_ROOTDIR=$(pwd)
 TARGET="$PROJECT_ROOTDIR/target/$PROJECT_VERSION"
 TARGET_LATEST="$PROJECT_ROOTDIR/target/latest/"

@@ -11,8 +11,8 @@ description:
 commands:
   init                Initialize resources necessary for CloudFlow and create a new generator from the current repository.
   deploy-project      Create or update a CI/CD project
-  configure           Set essential configuration
-
+  deploy-generator    Create a project generator based on the current repository.
+  configure           Set essential deployment and init configuration. 
 options:
   --help | -h help    Show this message
 
@@ -182,11 +182,11 @@ description:
   Creates/updates a CloudFlow CI/CD project based on a project template. 
 
 options:
-  --generator-version | -v <version>    Version of the project generator to use for deploying. Default is latest
   --project-template <name>             The name of a template-dir within the project-templates directory. Default is "default"
+  --generator-version | -v <version>    Version of the present project generator to use for deploying. Default is latest
   --project-is-generator                Use this flag when the created project is a project-generator itself. 
                                         See the cloudflow documentation for more details on generators.
-  --project-policies <key>              A key that is present in the file cloudflow/project_policies.yaml. The default key is "default"             
+  --project-policies <key>              A key that exists in the file cloudflow/project_policies.yaml. Default is "default"             
   --help | -h
 USAGE
   exit 1
@@ -201,7 +201,6 @@ function deploy-project() {
     case "$1" in 
       --project-name)
         project_name="$2"
-        check_nonempty_value project_name
         shift 2 ;;
       --project-template)
         project_template="$2"
@@ -228,7 +227,7 @@ function deploy-project() {
 
   generator_name=${GENERATOR_NAME:-$BOOTSTRAP_GENERATOR}
 
-  if [[ -z $project_name ]]; then echo "DEPLOY_ERROR: project-name cannot be empty" && exit 1; fi
+  check_nonempty_value project_name
 
   project_policy_arns=$(yq -r ".$project_policies_id" cloudflow/project_policies.yaml)
   if [[ -z $project_policy_arns ]]; then 
@@ -301,12 +300,25 @@ function init() {
   bootstrap_generator_artifacts "$BOOTSTRAP_GENERATOR"
 }
 
+function deploy_generator_usage {
+cat << USAGE >&2
+usage:
+  ${0##*/} deploy-generator --generator-name <name>
+
+description:
+  Creates a CloudFlow CI/CD project generator based on the current repository. 
+
+options:            
+  --help | -h
+USAGE
+  exit 1
+}
+
 function deploy-generator() {
   while [[ "$1" == -* ]]; do
     case "$1" in
-      --generator-name | -n)
+      --generator-name)
         generator_name="$2"
-        check_nonempty_value generator_name
         shift 2 ;;
       -h | --help)
         init_usage ;;
@@ -315,6 +327,10 @@ function deploy-generator() {
         init_usage
     esac
   done
+
+  check_nonempty_value generator_name
+
+  # This env variable is needed within the deploy-project command
   GENERATOR_NAME="$generator_name"
   bootstrap_generator_artifacts "$generator_name"
   deploy-project --project-name "$generator_name" --project-template "$generator_name"  --project-is-generator --project-policies "generator"

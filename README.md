@@ -2,10 +2,25 @@
 
 This repository contains a framework for gitflow-like CI/CD of AWS Infrastructure and all its dependencies. After initializing
 CloudFlow in your AWS account you will be able to create projects. A CloudFlow CI/CD project is represented by the diagram below.
-![](images/project_architecture.png)
+![Alternate text](images/project_architecture.png)
 
 It contains a CodeCommit repository that is connected to
 pipelines for building, deploying, testing, and maintaining CloudFormation stacks together with their dependencies on commits.
+
+## Table of Contents
+
+- [CloudFlow](#cloudflow)
+  - [Table of Contents](#table-of-contents)
+  - [Why should I use it?](#why-should-i-use-it)
+  - [Initializing CloudFlow](#initializing-cloudflow)
+  - [Creating Projects](#creating-projects)
+    - [In Detail](#in-detail)
+      - [Use CloudFlow pipelines for your projects](#use-cloudflow-pipelines-for-your-projects)
+      - [Develop your own pipelines](#develop-your-own-pipelines)
+  - [Using Projects](#using-projects)
+  - [CloudFlow Roles](#cloudflow-roles)
+    - [The CloudFlow Admin](#the-cloudflow-admin)
+    - [The CloudFlow DevOp](#the-cloudflow-devop)
 
 ## Why should I use it?
 
@@ -30,38 +45,11 @@ Clone this repository, cd into it and call
 ./cloudflow/bin/cfl.sh init
 ```
 
-After receiving the prompted input, CloudFlow will create its initial resources and a project generator in your account. If you
-do not wish to use your own CloudFlow generator, you can use the command
+After receiving the prompted input, CloudFlow will create its initial resources (which are s3 Buckets, a CloudTrail and a ssm parameter).
 
-```bash
-./cloudflow/bin/cfl.sh init --no-generator
-```
+## Creating Projects
 
-instead.
-
-## Creating CloudFlow projects
-
- Using your own generator within your AWS Account is the recommended way to create CloudFlow projects, since this way you will be benefitting from CI/CD of CI/CD (more on that in [Advanced Topics](#advanced-topics)).
-A generator can be created either directly through the init command or by calling
-
-```bash
-./cloudflow/bin/cfl.sh init --generator-only
-```
-
-The latter command will only succeed if you have initialized the necessary resources before. If you have created a project generator, clone it and call
-
-```bash
-./cloudflow/bin/cfl.sh deploy-project --project-name <name>
-```
-
-You might want to add a list of policies for your project in ```cloudflow/project_policies.yaml``` and pass the key to them through the ```--project-policies``` flag when creating the project.
-
-If you do not wish to work on your own generator, feel free to manage the policies and call the same command from this repository instead.
-
-You are done! Enjoy developing infrastructure as code in a modular way benefitting from automatic tests and all the other CI/CD niceties
-that you know from usual code ;)
-
-### TL;DR
+__tl; dr__
 
 Call
 
@@ -69,7 +57,29 @@ Call
 ./cloudflow/bin/cfl.sh deploy-project --project-name <name>
 ```
 
-either from this repo after initializing or from your own generator in CodeCommit.
+Lay back and and enjoy developing infrastructure as code in a modular way while benefitting from automatic tests and all the other CI/CD niceties.
+
+### In Detail
+
+There are two essentially different ways to create CloudFlow CI/CD projects.
+
+#### Use CloudFlow pipelines for your projects
+
+In this case you should create/update projects directly from the present repository by using the "cloudflow cli" - i.e. the script ```./cloudflow/bin/cfl.sh```. You only need to manage the configuration and possibly the project policies in ```./cloudflow/project_policies.yaml``` (see [Roles](#cloudflow-roles) for more detail on that). This is the easiest way to incorporate updates of CloudFlow into your projects.
+
+#### Develop your own pipelines
+
+In case you do want to adjust the CloudFlow default pipelines to your needs, the recommended way is to create one or multiple CloudFlow project generators by calling
+
+```bash
+./cloudflow/bin/cfl.sh deploy-generator --generator-name <name>
+```
+
+This command will create a CloudFlow generator (which is a special case of a CloudFlow project) based on the present repository in your AWS account. You can adjust the resulting generators according to your needs and benefit from their self-modification on commits (see [CloudFlow generators](GENERATOR_README.md) for more details).
+
+## Using Projects
+
+A CloudFlow project is used by creating feature branches, pushing changes and merging branches to develop and master. Usually, no interaction with the AWS console apart from monitoring the deployments will be needed. A detailed account on how to work with CloudFlow projects can be found [here](project-templates/default/README.md).
 
 ## CloudFlow Roles
 
@@ -84,20 +94,14 @@ The Admin manages one or multiple CloudFlow generators. They can do the followin
   3) Choose where the project artifacts will be uploaded to
   4) Develop the CloudFlow generators which will update themselves on release
 
+More detailed information can be found in the [CloufFlow Generator Readme](GENERATOR_README.md).
+
 ### The CloudFlow DevOp
 
-The DevOp is the recipient of a CloudFlow project. They have control over the project's artifacts and the build process. The build process can be customized by adjusting ```buildspec.yaml```. By default the script and
-configuration ```build.sh``` and ```build.conf``` are used during the build. On commit to different branches
-all artifacts will be built, versioned and uploaded to S3. On commit to branches starting with
-"feature/" the stack parametrized by the develop config will be deployed, tested and deleted.
-On merging to the develop branch, which has to be created at the very beginning, the develop stack will be updated. This way the DevOp will know that an update can be safely performed on the live stack. Finally, on merging develop to master the live stack is updated. The project version should be changed when performing merges to develop and especially to master, since the latter is a release of the stack and all artifacts within the project.
+The DevOp is the recipient of a CloudFlow project. They have control over the project's artifacts and the build process.  On commit to different branches all artifacts will be built, versioned and uploaded to S3.
 
-It is easy to reference released artifacts across all projects. This modularity and code-sharing is one of the main ideas behind CloudFlow. For more information on referencing artifacts see [Advanced Topics](#advanced-topics)
+Stacks for each branch will be deployed after a successful upload. On merging to the develop branch, the develop stack will be updated. This way the DevOp will know that an update can be safely performed on the live stack. Finally, on merging develop to master the live stack is updated. The DevOp has control over the stack's develop and live configuration.
 
-## Repository Structure
+It is easy to reference released artifacts across all projects. This modularity and code-sharing is one of the main ideas behind CloudFlow. 
 
-tba
-
-## Advanced Topics
-
-tba
+More detailed information can be found in the [CloufFlow Project Readme](project-templates/default/README.md).

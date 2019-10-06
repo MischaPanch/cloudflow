@@ -110,9 +110,9 @@ More detailed information can be found in the [CloufFlow Project Readme](project
 
 ## Contributing
 
-CloudFlow can benefit greatly from contributions from its users. Please contact me at mischa.panch@gmail.com if you want to contribute or open an issue if you encounter a bug or have a question. There are two simple ways to contribute:
+CloudFlow can benefit greatly from contributions from its users. Please contact me at mischa.panch@gmail.com if you want to contribute. Please open an issue if you encounter a bug or have a question. There are two simple ways to contribute:
 
-- If you have used CloudFlow to setup a cool project, consider contributing it to the project-templates. Over time together we can assemble a collection of templates for CI/CD projects for all kinds of resources.
-- If you have adjusted CloudFlow generators for your own case and incorporated a new feature, consider creating a pull request for it.
+- If you have used CloudFlow to setup a cool project, consider making a pull request and add it to the project-templates. Over time, together we can assemble a collection of templates for CI/CD projects for all kinds of resources.
+- If you have adjusted CloudFlow Generators for your own case and incorporated a new feature, consider creating a pull request for it.
 
 Of course, all other contributions and remarks are highly welcome as well.

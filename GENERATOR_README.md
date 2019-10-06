@@ -21,7 +21,7 @@ By default this repository contains the CloudFlow CLI. You might have to turn it
 chmod +x cloudflow/bin/cfl/sh
 ```
 
-Apart from the `init` and `deploy-project commands`, the cli supports the `deploy-generator` command. This will create a new generator based on the __current generator__, i.e. on this repository. It can be useful to work with different generators when creating projects for mutliple purposes or teams.
+Apart from the `init` and `deploy-project` commands, the cli contains the `deploy-generator` command. This will create a new generator based on the __current generator__, i.e. on this repository. It can be useful to work with different generators when creating projects for mutliple purposes or teams.
 
 ## Deployment Policies
 

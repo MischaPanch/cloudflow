@@ -10,7 +10,7 @@ You should always have a master and develop branch and create branches called "f
 
 When a new feature is finished and all tests have passed, increase the ProjectVersion in `develop_config.json` and merge the feature branch to develop. 
 
-For relesing a new version, increase the _ProjectVersion_ in `live_config.json` and merge the develop branch into master.
+For releasing a new version, increase the _ProjectVersion_ in `live_config.json` and merge the develop branch into master.
 
 ## Under the hood
 

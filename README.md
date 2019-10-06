@@ -1,7 +1,8 @@
 # CloudFlow
 
 This repository contains a framework for gitflow-like CI/CD of AWS Infrastructure and all its dependencies. After initializing
-CloudFlow in your AWS account you will be able to create projects. A CloudFlow CI/CD project is represented by the diagram below.
+CloudFlow in your AWS account you will be able to create projects. A CloudFlow CI/CD project is represented by the following diagram:
+
 ![Alternate text](images/project_architecture.png)
 
 It contains a CodeCommit repository that is connected to
@@ -13,7 +14,7 @@ pipelines for building, deploying, testing, and maintaining CloudFormation stack
   - [Table of Contents](#table-of-contents)
   - [Why should I use it?](#why-should-i-use-it)
   - [Initializing CloudFlow](#initializing-cloudflow)
-  - [Creating Projects](#creating-projects)
+  - [Creating and Updating Projects](#creating-and-updating-projects)
     - [In Detail](#in-detail)
       - [Use CloudFlow pipelines for your projects](#use-cloudflow-pipelines-for-your-projects)
       - [Develop your own pipelines](#develop-your-own-pipelines)
@@ -21,6 +22,7 @@ pipelines for building, deploying, testing, and maintaining CloudFormation stack
   - [CloudFlow Roles](#cloudflow-roles)
     - [The CloudFlow Admin](#the-cloudflow-admin)
     - [The CloudFlow DevOp](#the-cloudflow-devop)
+  - [Contributing](#contributing)
 
 ## Why should I use it?
 
@@ -47,7 +49,7 @@ Clone this repository, cd into it and call
 
 After receiving the prompted input, CloudFlow will create its initial resources (which are s3 Buckets, a CloudTrail and a ssm parameter).
 
-## Creating Projects
+## Creating and Updating Projects
 
 __tl; dr__
 
@@ -61,7 +63,7 @@ Lay back and and enjoy developing infrastructure as code in a modular way while 
 
 ### In Detail
 
-There are two essentially different ways to create CloudFlow CI/CD projects.
+There are two essentially different ways to manage CloudFlow CI/CD projects.
 
 #### Use CloudFlow pipelines for your projects
 
@@ -105,3 +107,12 @@ Stacks for each branch will be deployed after a successful upload. On merging to
 It is easy to reference released artifacts across all projects. This modularity and code-sharing is one of the main ideas behind CloudFlow. 
 
 More detailed information can be found in the [CloufFlow Project Readme](project-templates/default/README.md).
+
+## Contributing
+
+CloudFlow can benefit greatly from contributions from its users. Please contact me at mischa.panch@gmail.com if you want to contribute or open an issue if you encounter a bug or have a question. There are two simple ways to contribute:
+
+- If you have used CloudFlow to setup a cool project, consider contributing it to the project-templates. Over time together we can assemble a collection of templates for CI/CD projects for all kinds of resources.
+- If you have adjusted CloudFlow generators for your own case and incorporated a new feature, consider creating a pull request for it.
+
+Of course, all other contributions and remarks are highly welcome as well.

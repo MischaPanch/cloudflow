@@ -1,6 +1,6 @@
 # Default CloudFlow Project
 
-This repository is as part of a [CloudFlow](https://github.com/MischaPanch/cloudflow) cicd project. It contains a small stack meant for demonstration puproses.
+This repository is as part of a [CloudFlow](https://github.com/MischaPanch/cloudflow) CI/CD project. It contains a small stack meant for demonstration puproses.
 
 ## The CI/CD workflow
 
@@ -10,7 +10,7 @@ You should always have a master and develop branch and create branches called "f
 
 When a new feature is finished and all tests have passed, increase the ProjectVersion in `develop_config.json` and merge the feature branch to develop. 
 
-For relesing a new version, increase the ProjectVersion in `live_config.json` and merge the develop branch into master.
+For relesing a new version, increase the _ProjectVersion_ in `live_config.json` and merge the develop branch into master.
 
 ## Under the hood
 
@@ -24,7 +24,7 @@ Builds of each branch are triggered by commits. The build process is defined by 
 
 The result of the build will be uploaded to the BuildArtifactsBucket under the key `<ProjectName>/<BranchName>/<ProjectVersion>`. Additionally, on each commit the "latest" version on the corresponding branch will be updated. You can reference artifacts within your project by using the corresponding parameters in your `stack.yaml` (an example for such referencing can be found e.g. in the [CloudFlow generator stack](https://github.com/MischaPanch/cloudflow/blob/feature/separate-generator-creation/cloudformation/stack/stack.yaml)).
 
-For referencing artifacts that were released in other CloudFlow projects, simply substitute the corresponding ProjectName and ProjectVersion and use "master" as BranchName.
+For referencing artifacts that were released in other CloudFlow projects, simply substitute the corresponding _ProjectName_ and _ProjectVersion_ and use "master" as _BranchName_.
 
 ### Deployment
 

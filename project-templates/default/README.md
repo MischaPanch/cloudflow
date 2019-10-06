@@ -42,14 +42,4 @@ Part of your stack is the Lambda function within the template `ExecuteTest` whic
 
 ## Get started
 
-Unfortunately, there are some restriction in AWS for creating CodeCommit repositories, therefore you will have to __create the develop branch manually__ before starting to code. 
-
-In case you want to execute local builds, you have to make `build.sh` executable. The following commands are a good starting point:
-
-```bash
-git branch develop && git checkout develop
-chmod +x build.sh
-git add build.sh && git commit -m "adjusted build.sh permissions" && git push
-```
-
-After this you can follow the CI/CD workflow as described above.
+In case you want to execute local builds, you have to make `build.sh` executable, e.g. by calling `chmod +x build.sh`.

@@ -51,7 +51,7 @@ function abort() {
   exit 1
 }
 
-function try-except() {
+function try_except() {
   command=$1
   caught_error_code=$2
   except=$3
@@ -131,7 +131,7 @@ function bootstrap_generator_artifacts() {
   )
   # preparing the workspace
   cleanup="Y"
-  try-except "mkdir $PROJECT_TEMPLATES/$bootstrap_generator_name" \
+  try_except "mkdir $PROJECT_TEMPLATES/$bootstrap_generator_name" \
   1 \
   "read -rp \"The file $PROJECT_TEMPLATES/$bootstrap_generator_name already exists, overwrite it? Y/[n] \" \"cleanup\" "
   if [[ "$cleanup" != "Y" ]]; then abort; fi
@@ -149,6 +149,13 @@ function bootstrap_generator_artifacts() {
   rm -rf "$PROJECT_TEMPLATES/${bootstrap_generator_name:?}"
   rm -rf tmp/*
   rm -rf target/*
+}
+
+function create_develop_branch() {
+  branch_info=$(aws codecommit get-branch --repository-name "$1" --branch-name master)
+  commit_id=$(jq -r .branch.commitId <<<"$branch_info")
+  aws codecommit create-branch --repository-name "$1" --branch-name develop --commit-id "$commit_id"
+  exit 0 
 }
 
 # cloudflow cli commands
@@ -250,7 +257,8 @@ function deploy-project() {
                         "ProjectVersion=$generator_version" \
                         "BranchName=master" \
                         "Stage=master"
-  aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$project_name" 
+  aws cloudformation update-termination-protection --enable-termination-protection --stack-name "$project_name"
+  try_except "create_develop_branch $project_name" 255
 }
 
 function init_usage {

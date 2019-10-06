@@ -5,6 +5,7 @@ CloudFlow in your AWS account you will be able to create projects. A CloudFlow C
 
 ![Alternate text](images/project_architecture.png)
 
+
 It contains a CodeCommit repository that is connected to
 pipelines for building, deploying, testing, and maintaining CloudFormation stacks together with their dependencies on commits.
 
@@ -51,6 +52,7 @@ After receiving the prompted input, CloudFlow will create its initial resources 
 
 ## Creating and Updating Projects
 
+
 __tl; dr__
 
 Call
@@ -59,7 +61,7 @@ Call
 ./cloudflow/bin/cfl.sh deploy-project --project-name <name>
 ```
 
-Lay back and and enjoy developing infrastructure as code in a modular way while benefitting from automatic tests and all the other CI/CD niceties.
+Lay back and enjoy developing infrastructure as code in a modular way while benefitting from automatic tests and all the other CI/CD niceties.
 
 ### In Detail
 
